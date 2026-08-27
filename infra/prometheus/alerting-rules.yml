@@ -1,0 +1,76 @@
+# Prometheus alerting rules for SNT AI Assurance Platform
+groups:
+  - name: snt-ai-backend
+    interval: 30s
+    rules:
+      - alert: BackendDown
+        expr: up{job="snt-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backend service is down"
+          description: "SNT AI backend has been unreachable for over 1 minute."
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status_code=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP error rate ({{ $value | humanizePercentage }})"
+          description: "More than 5% of requests are returning 5xx errors."
+
+      - alert: SlowResponses
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 response time exceeds 5s"
+          description: "The 95th percentile response time is {{ $value }}s."
+
+      - alert: HighEvaluationFailureRate
+        expr: rate(snt_evaluation_failures_total[30m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Evaluation failures detected"
+          description: "Evaluations are failing in the last 30 minutes."
+
+      - alert: ClickHouseDown
+        expr: clickhouse_uptime == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ClickHouse is down"
+          description: "ClickHouse analytics database is unreachable."
+
+      - alert: ScoreRegression
+        expr: snt_aggregate_score < 0.6
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Aggregate score dropped below 0.6"
+          description: "The evaluation aggregate score is {{ $value }}."
+
+      - alert: TemporalWorkflowFailures
+        expr: rate(temporal_workflow_failures_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Temporal workflow failures"
+          description: "Temporal workflows are failing in the last 15 minutes."
+
+      - alert: HighLatencyP99
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "P99 latency exceeds 10s"
+          description: "The 99th percentile response time is {{ $value }}s."

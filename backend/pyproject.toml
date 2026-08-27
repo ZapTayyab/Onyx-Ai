@@ -1,0 +1,27 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "PT", "RUF", "B", "SIM"]
+ignore = ["E501", "B904", "SIM117"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["RUF012"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]
+markers = [
+    "integration: marks tests that require external services",
+    "slow: marks tests as slow",
+]

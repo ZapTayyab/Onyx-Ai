@@ -1,0 +1,126 @@
+{
+  "title": "SNT AI Platform Overview",
+  "uid": "snt-ai-overview",
+  "version": 1,
+  "tags": ["snt-ai", "production"],
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP Request Rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{job='snt-backend'}[5m])",
+          "legendFormat": "{{method}} {{route}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "displayMode": "table" }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "P50 / P95 / P99 Latency",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))", "legendFormat": "p50", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))", "legendFormat": "p95", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))", "legendFormat": "p99", "refId": "C" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 3,
+      "title": "Error Rate by Status Code",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        { "expr": "rate(http_requests_total{status_code=~'4..'}[5m])", "legendFormat": "4xx", "refId": "A" },
+        { "expr": "rate(http_requests_total{status_code=~'5..'}[5m])", "legendFormat": "5xx", "refId": "B" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Evaluation Aggregate Score (Last 30 Runs)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "avg(snt_aggregate_score)", "legendFormat": "Avg Score", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red", "value": null },
+            { "color": "orange", "value": 0.6 },
+            { "color": "green", "value": 0.8 }
+          ]}
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Evaluation Runs (24h)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 4, "y": 8 },
+      "targets": [
+        { "expr": "increase(snt_evaluation_runs_total[24h])", "legendFormat": "Runs", "refId": "A" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Active Temporal Workflows",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 4, "x": 8, "y": 8 },
+      "targets": [
+        { "expr": "sum(temporal_workflow_executions_running)", "legendFormat": "Active", "refId": "A" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "ClickHouse Query Performance",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "rate(clickhouse_query_duration_seconds_sum[5m]) / rate(clickhouse_query_duration_seconds_count[5m])", "legendFormat": "Avg Query Time", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 8,
+      "title": "Score Distribution (Last Run)",
+      "type": "barchart",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "targets": [
+        { "expr": "snt_score_distribution_bucket", "legendFormat": "{{le}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Chaos Injection Events",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "rate(snt_chaos_injections_total[5m])", "legendFormat": "{{type}}", "refId": "A" }
+      ]
+    }
+  ]
+}

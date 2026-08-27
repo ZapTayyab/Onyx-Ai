@@ -1,0 +1,216 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: snt-postgres
+    environment:
+      POSTGRES_DB: snt_ai
+      POSTGRES_USER: snt
+      POSTGRES_PASSWORD: snt
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U snt -d snt_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: snt-clickhouse
+    environment:
+      CLICKHOUSE_DB: snt_ai
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./init/clickhouse:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: snt-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    restart: unless-stopped
+
+  temporal:
+    image: temporalio/auto-setup:1.25.2
+    container_name: snt-temporal
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: snt
+      POSTGRES_PWD: snt
+      POSTGRES_SEEDS: postgres
+      DYNAMIC_CONFIG_VALUE: "{}"
+    ports:
+      - "7233:7233"
+      - "8233:8233"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *default-logging
+    restart: unless-stopped
+
+  temporal-admin-tools:
+    image: temporalio/admin-tools:1.25
+    container_name: snt-temporal-admin
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CLI_ADDRESS: temporal:7233
+    logging: *default-logging
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: snt-backend
+    environment:
+      SNT_ENVIRONMENT: development
+      SNT_DEBUG: "true"
+      SNT_LOG_LEVEL: DEBUG
+      SNT_POSTGRES_DSN: postgresql+asyncpg://snt:snt@postgres:5432/snt_ai
+      SNT_CLICKHOUSE_HOST: clickhouse
+      SNT_CLICKHOUSE_PORT: 8123
+      SNT_CLICKHOUSE_DATABASE: snt_ai
+      SNT_REDIS_DSN: redis://redis:6379/0
+      SNT_TEMPORAL_HOST: temporal:7233
+      SNT_AUTH_PROVIDER: local
+      SNT_CLERK_SECRET_KEY: ""
+      SNT_CLERK_PUBLISHABLE_KEY: ""
+      SNT_OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging: *default-logging
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: snt-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+    logging: *default-logging
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.112.0
+    container_name: snt-otel
+    command: ["--config=/etc/otel-collector-config.yml"]
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml
+    logging: *default-logging
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.0
+    container_name: snt-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alerting-rules.yml:/etc/prometheus/alerting-rules.yml
+      - prometheus_data:/prometheus
+    logging: *default-logging
+    restart: unless-stopped
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: snt-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://snt:snt@postgres:5432/snt_ai?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *default-logging
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: snt-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # Jaeger UI
+    logging: *default-logging
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: snt-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    logging: *default-logging
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:

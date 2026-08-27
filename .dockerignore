@@ -1,0 +1,10 @@
+__pycache__/
+.pytest_cache/
+.github/
+.trae/
+.uploads/
+*.pyc
+*.pyo
+*.pyd
+*.log
+tests/

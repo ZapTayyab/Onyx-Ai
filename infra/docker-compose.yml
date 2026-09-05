@@ -155,7 +155,7 @@ services:
       backend:
         condition: service_healthy
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       BACKEND_INTERNAL_URL: http://backend:8000/v1
     logging: *default-logging
     restart: unless-stopped
@@ -165,7 +165,7 @@ services:
     container_name: snt-caddy
     environment:
       DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
-      TLS_CONFIG: ${TLS_CONFIG:-tls internal}
+    # Automatic HTTPS: Let's Encrypt for public domains, internal CA for localhost.
     ports:
       - "80:80"
       - "443:443"

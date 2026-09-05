@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from enum import StrEnum
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import Field, PostgresDsn, RedisDsn, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class RuntimeEnvironment(StrEnum):
@@ -55,7 +56,9 @@ class AppConfig(BaseSettings):
     app_name: str = "SNT AI Assurance Platform"
     company_name: str = "SNT AI"
     support_email: str = "support@snt.ai"
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8501"]
+    # NoDecode: accept a plain comma-separated SNT_CORS_ORIGINS env value
+    # (pydantic-settings otherwise requires JSON for list fields).
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000", "http://localhost:8501"]
 
     postgres_dsn: PostgresDsn = Field(
         default="postgresql+asyncpg://snt:snt@localhost:5432/snt_ai",

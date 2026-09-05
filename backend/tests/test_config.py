@@ -25,6 +25,13 @@ class TestAppConfig:
         config = AppConfig(cors_origins=["http://localhost:3000"])
         assert "http://localhost:3000" in config.cors_origins
 
+    def test_cors_origins_from_comma_separated_env(self, monkeypatch) -> None:
+        # Regression: SNT_CORS_ORIGINS is a plain comma-separated string in
+        # docker-compose — pydantic-settings must not require JSON for list fields.
+        monkeypatch.setenv("SNT_CORS_ORIGINS", "https://app.example.com,http://localhost:3000")
+        config = AppConfig(_env_file=None)
+        assert config.cors_origins == ["https://app.example.com", "http://localhost:3000"]
+
 
 class TestEnums:
     def test_billing_plan_values(self) -> None:

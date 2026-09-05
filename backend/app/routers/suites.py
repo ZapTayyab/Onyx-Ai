@@ -82,10 +82,11 @@ async def get_suite(
     payload: TokenPayload = Depends(require_member),
     db: AsyncSession = Depends(get_async_session),
 ) -> EvaluationSuiteModel:
+    org_id = uuid.UUID(str(payload.org_id))
     result = await db.execute(
         select(EvaluationSuiteModel).where(
             EvaluationSuiteModel.id == suite_id,
-            EvaluationSuiteModel.organization_id == payload.org_id,
+            EvaluationSuiteModel.organization_id == org_id,
         )
     )
     suite = result.scalar_one_or_none()

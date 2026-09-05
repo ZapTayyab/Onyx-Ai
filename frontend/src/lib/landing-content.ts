@@ -20,10 +20,10 @@ export const hero = {
   cta: { label: "Request a demo", href: "/request-demo" },
   ctaSecondary: { label: "View documentation", href: "/docs" },
   trustPills: [
-    "SOC 2 compliant",
-    "SSO / SAML / OIDC",
+    "Built for SOC 2 readiness",
+    "SSO-ready (OIDC via Clerk / Auth0)",
     "Role-based access control",
-    "Immutable audit logging",
+    "Audit logging",
   ],
 };
 
@@ -115,7 +115,7 @@ export const pipelineSteps: PipelineStep[] = [
   {
     number: "06",
     title: "Audit Export",
-    description: "Generate JUnit XML reports, signed evidence snapshots, and one-click compliance packages.",
+    description: "Generate JUnit XML reports, evidence exports, and one-click compliance packages.",
     icon: "FileText",
     phase: "output",
     duration: "~2min",
@@ -177,7 +177,7 @@ export const capabilities: Capability[] = [
   },
   {
     title: "Audit-Ready Evidence",
-    description: "Immutable trace logs, hash-chain verified audit snapshots, and one-click compliance export for SOC 2, ISO 27001, and internal reviews.",
+    description: "Full trace logs, one-click compliance export for SOC 2, ISO 27001, and internal reviews.",
     outcome: "Hours of compliance prep reduced to minutes",
     icon: "FileText",
     metric: { value: "30s", label: "export vs 15min manual" },
@@ -188,20 +188,16 @@ export const security = {
   eyebrow: "Security & Compliance",
   headline: "Governance built into every layer of the platform.",
   bullets: [
-    "SOC 2 compliant \u2014 audit in progress with third-party examiner",
-    "AES-256 encryption at rest and TLS 1.3 in transit",
-    "SSO via SAML 2.0 and OIDC (Clerk, Auth0, Okta)",
-    "Role-based access control \u2014 Owner, Admin, Member, Viewer",
-    "Immutable audit logging with hash-chain verification",
-    "Customer-managed encryption keys (AWS KMS, Azure Key Vault)",
-    "Data residency controls \u2014 EU, US, and APAC regions",
-    "Annual third-party penetration testing",
+    "Built for SOC 2 readiness \u2014 audit in progress with third-party examiner",
+    "Encrypted in transit (TLS)",
+    "SSO-ready \u2014 OIDC token verification (Clerk, Auth0)",
+    "Role-based access control \u2014 Admin, Member, Viewer",
+    "Audit logging of security-relevant events",
   ],
   badges: [
-    "SOC 2 Type II",
-    "ISO 42001",
-    "End-to-end encrypted",
-    "Zero data retention",
+    "SOC 2 readiness",
+    "Encrypted in transit (TLS)",
+    "No training on your data",
   ],
   frameworks: [
     { name: "SOC 2", x: 50, y: 5 },
@@ -242,7 +238,7 @@ export const pricingOverview = {
         { text: "Chaos injection testing", included: false },
         { text: "CI/CD integration", included: false },
         { text: "Audit-ready reports", included: false },
-        { text: "SSO / SAML / OIDC", included: false },
+        { text: "SSO-ready (OIDC via Clerk / Auth0)", included: false },
       ],
     },
     {
@@ -259,7 +255,7 @@ export const pricingOverview = {
         { text: "Chaos injection testing", included: true },
         { text: "CI/CD integration", included: true },
         { text: "Audit-ready reports", included: true },
-        { text: "SSO / SAML / OIDC", included: false },
+        { text: "SSO-ready (OIDC via Clerk / Auth0)", included: false },
       ],
       popular: true,
     },
@@ -277,11 +273,11 @@ export const pricingOverview = {
         { text: "Chaos injection testing", included: true },
         { text: "CI/CD integration", included: true },
         { text: "Audit-ready reports", included: true },
-        { text: "SSO / SAML / OIDC", included: true },
+        { text: "SSO-ready (OIDC via Clerk / Auth0)", included: true },
       ],
     },
   ],
-  trustLine: "All plans include SOC 2 audit logging, encrypted model interactions, and a dedicated security review.",
+  trustLine: "All plans include audit logging, encrypted model interactions, and a dedicated security review.",
 };
 
 export const blogOverview = {
@@ -323,7 +319,7 @@ export const cta = {
     "Live audit on your model",
     "Audit report delivered",
   ],
-  trustLine: "No model data retained \u00b7 Cancel anytime \u00b7 SOC 2 compliant",
+  trustLine: "No training on your data \u00b7 Cancel anytime \u00b7 Built for SOC 2 readiness",
 };
 
 export const footerLinks = {
@@ -344,11 +340,5 @@ export const footerLinks = {
     { label: "Careers", href: "/careers" },
     { label: "Contact", href: "/contact" },
     { label: "Status", href: "/status" },
-  ],
-  compliance: [
-    { label: "SOC 2", href: "/security" },
-    { label: "Privacy Policy", href: "/privacy" },
-    { label: "Terms of Service", href: "/terms" },
-    { label: "DPA", href: "/dpa" },
   ],
 };

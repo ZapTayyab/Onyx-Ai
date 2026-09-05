@@ -42,7 +42,7 @@ const plans = [
     features: [
       "Unlimited evaluations",
       "Custom persona development",
-      "SSO / SAML / OIDC",
+      "SSO-ready (OIDC via Clerk / Auth0)",
       "Dedicated infrastructure",
       "24/7 premium support",
       "Custom integrations",
@@ -141,7 +141,7 @@ export default function PricingPage() {
           <div className="mx-auto max-w-7xl px-6 text-center">
             <h2 className="text-lg font-semibold text-slate-900">Trusted by enterprise teams</h2>
             <p className="mt-2 text-sm text-slate-600">
-              SOC 2 compliant · SSO / SAML / OIDC · Immutable audit logging · Data residency controls
+              Built for SOC 2 readiness · SSO-ready (OIDC via Clerk / Auth0) · Audit logging
             </p>
           </div>
         </section>

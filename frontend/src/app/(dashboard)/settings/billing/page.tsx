@@ -25,7 +25,7 @@ const plans = [
     name: "Enterprise",
     price: "Custom",
     period: "",
-    features: ["Unlimited evaluations", "Unlimited agents", "SSO/SAML", "Dedicated support", "SLA", "On-premise option"],
+    features: ["Unlimited evaluations", "Unlimited agents", "SSO-ready (OIDC)", "Dedicated support", "SLA", "On-premise option"],
     current: false,
   },
 ];

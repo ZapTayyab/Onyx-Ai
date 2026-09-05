@@ -3,11 +3,11 @@ import { security } from "@/lib/landing-content";
 import { Shield, Check, ShieldCheck } from "lucide-react";
 
 const frameworks = [
-  { name: "SOC 2", status: "Type II certified" },
-  { name: "EU AI Act", status: "Compliant" },
-  { name: "ISO 42001", status: "In progress" },
-  { name: "NIST AI RMF", status: "Aligned" },
-  { name: "GDPR", status: "Compliant" },
+  { name: "SOC 2", status: "Readiness program" },
+  { name: "EU AI Act", status: "Not yet assessed" },
+  { name: "ISO 42001", status: "Not yet assessed" },
+  { name: "NIST AI RMF", status: "Mapping in progress" },
+  { name: "GDPR", status: "Not yet assessed" },
 ];
 
 export function SecuritySection() {
@@ -95,10 +95,6 @@ export function SecuritySection() {
                   ))}
                 </div>
 
-                <p className="mt-4 text-center text-[11px] text-slate-400">
-                  <Check className="h-3 w-3 inline -mt-0.5 mr-1 text-emerald-500" />
-                  Annual third-party penetration testing
-                </p>
               </div>
             </div>
           </Reveal>

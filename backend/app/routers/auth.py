@@ -36,7 +36,15 @@ async def login(
 ) -> TokenResponse:
     config = get_config()
 
+    # DEV-ONLY backdoor — explicitly blocked in production regardless of any
+    # other config to prevent accidental credential exposure.
     if config.is_development:
+        if config.is_production:
+            # This path should never be reachable, but belt-and-suspenders.
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Dev login is disabled in production",
+            )
         if body.email == "admin@snt.ai" and body.password == "admin":
             result = await db.execute(
                 select(OrganizationModel).where(OrganizationModel.slug == "demo")

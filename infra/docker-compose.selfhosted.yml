@@ -1,0 +1,86 @@
+# Self-hosted deployment compose file.
+# ALL required variables must be supplied via a .env file or your secrets manager.
+# Do NOT hardcode any credentials in this file.
+#
+# Required environment variables:
+#   POSTGRES_USER, POSTGRES_PASSWORD
+#   CLICKHOUSE_PASSWORD
+#   REDIS_PASSWORD
+#   SNT_ENCRYPTION_KEY   (random secret; must not be the dev default)
+#   SNT_AUTH_PROVIDER    (clerk | auth0; local is dev-only and refused in production)
+#   SNT_CORS_ORIGINS     (comma-separated list of your frontend origins)
+#   SNT_CLERK_SECRET_KEY / SNT_AUTH0_DOMAIN etc. (if using cloud auth)
+#
+# SNT_* variables are consumed by backend/app/config.py (env prefix SNT_).
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: snt-postgres-selfhosted
+    environment:
+      POSTGRES_DB: snt_ai
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    # NOTE: No host port binding — Postgres is internal-only.
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data_selfhosted:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8-alpine
+    container_name: snt-clickhouse-selfhosted
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD must be set}
+      CLICKHOUSE_DB: snt_ai
+    # NOTE: No host port binding — ClickHouse is internal-only.
+    expose:
+      - "8123"
+      - "9000"
+    volumes:
+      - clickhouse_data_selfhosted:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: snt-redis-selfhosted
+    command: >-
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    # NOTE: No host port binding — Redis is internal-only.
+    expose:
+      - "6379"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: snt-backend-selfhosted
+    ports:
+      - "8000:8000"
+    environment:
+      SNT_ENVIRONMENT: ${SNT_ENVIRONMENT:-production}
+      SNT_AUTH_PROVIDER: ${SNT_AUTH_PROVIDER:?SNT_AUTH_PROVIDER must be set}
+      SNT_POSTGRES_DSN: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/snt_ai
+      SNT_CLICKHOUSE_HOST: clickhouse
+      SNT_CLICKHOUSE_PORT: 8123
+      SNT_CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD must be set}
+      SNT_REDIS_DSN: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SNT_ENCRYPTION_KEY: ${SNT_ENCRYPTION_KEY:?SNT_ENCRYPTION_KEY must be set}
+      SNT_CORS_ORIGINS: ${SNT_CORS_ORIGINS:?SNT_CORS_ORIGINS must be set to your production domain}
+    depends_on:
+      - postgres
+      - clickhouse
+      - redis
+    restart: unless-stopped
+
+volumes:
+  postgres_data_selfhosted:
+  clickhouse_data_selfhosted:

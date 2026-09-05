@@ -39,11 +39,11 @@ class EvaluationStatusResponse(BaseModel):
     status: RunStatus
     total_sessions: int
     completed_sessions: int
-    aggregate_score: float | None
-    summary_metrics: dict | None
-    error_message: str | None
-    started_at: datetime | None
-    completed_at: datetime | None
+    aggregate_score: float | None = None
+    summary_metrics: dict | None = None
+    error_message: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

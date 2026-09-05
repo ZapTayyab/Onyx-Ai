@@ -10,16 +10,19 @@ services:
     container_name: snt-postgres
     environment:
       POSTGRES_DB: snt_ai
-      POSTGRES_USER: snt
-      POSTGRES_PASSWORD: snt
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_HOST_AUTH_METHOD: scram-sha-256
-    ports:
-      - "5432:5432"
+    # NOTE: No host port binding — Postgres is internal-only.
+    # To connect from your machine during development, use:
+    #   docker compose exec postgres psql -U $POSTGRES_USER snt_ai
+    expose:
+      - "5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init/postgres:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U snt -d snt_ai"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-snt} -d snt_ai"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -31,12 +34,13 @@ services:
     container_name: snt-clickhouse
     environment:
       CLICKHOUSE_DB: snt_ai
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD must be set}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    ports:
-      - "8123:8123"
-      - "9000:9000"
+    # NOTE: No host port binding — ClickHouse is internal-only.
+    expose:
+      - "8123"
+      - "9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./init/clickhouse:/docker-entrypoint-initdb.d
@@ -51,12 +55,16 @@ services:
   redis:
     image: redis:7-alpine
     container_name: snt-redis
-    ports:
-      - "6379:6379"
+    command: >-
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    # NOTE: No host port binding — Redis is internal-only.
+    expose:
+      - "6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -69,13 +77,14 @@ services:
     environment:
       DB: postgres12
       DB_PORT: 5432
-      POSTGRES_USER: snt
-      POSTGRES_PWD: snt
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PWD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_SEEDS: postgres
       DYNAMIC_CONFIG_VALUE: "{}"
-    ports:
-      - "7233:7233"
-      - "8233:8233"
+    # NOTE: No host port binding — Temporal gRPC and UI are internal-only.
+    expose:
+      - "7233"
+      - "8233"
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,21 +107,25 @@ services:
       dockerfile: Dockerfile
     container_name: snt-backend
     environment:
-      SNT_ENVIRONMENT: development
-      SNT_DEBUG: "true"
-      SNT_LOG_LEVEL: DEBUG
-      SNT_POSTGRES_DSN: postgresql+asyncpg://snt:snt@postgres:5432/snt_ai
+      SNT_ENVIRONMENT: ${SNT_ENVIRONMENT:-production}
+      SNT_DEBUG: ${SNT_DEBUG:-false}
+      SNT_LOG_LEVEL: ${SNT_LOG_LEVEL:-INFO}
+      SNT_POSTGRES_DSN: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/snt_ai
       SNT_CLICKHOUSE_HOST: clickhouse
       SNT_CLICKHOUSE_PORT: 8123
       SNT_CLICKHOUSE_DATABASE: snt_ai
-      SNT_REDIS_DSN: redis://redis:6379/0
+      SNT_CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      SNT_REDIS_DSN: redis://:${REDIS_PASSWORD}@redis:6379/0
       SNT_TEMPORAL_HOST: temporal:7233
-      SNT_AUTH_PROVIDER: local
-      SNT_CLERK_SECRET_KEY: ""
-      SNT_CLERK_PUBLISHABLE_KEY: ""
+      SNT_AUTH_PROVIDER: ${SNT_AUTH_PROVIDER:?SNT_AUTH_PROVIDER must be set (clerk|auth0|local)}
+      SNT_CLERK_SECRET_KEY: ${SNT_CLERK_SECRET_KEY:-}
+      SNT_CLERK_PUBLISHABLE_KEY: ${SNT_CLERK_PUBLISHABLE_KEY:-}
+      SNT_ENCRYPTION_KEY: ${SNT_ENCRYPTION_KEY:?SNT_ENCRYPTION_KEY must be set}
+      SNT_CORS_ORIGINS: ${SNT_CORS_ORIGINS:?SNT_CORS_ORIGINS must be set to your production domain}
       SNT_OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
-    ports:
-      - "8000:8000"
+    # NOTE: No host port binding — Backend is internal-only, reverse-proxied by Caddy.
+    expose:
+      - "8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -135,13 +148,34 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
     container_name: snt-frontend
-    ports:
-      - "3000:3000"
+    # NOTE: No host port binding — Frontend is internal-only, reverse-proxied by Caddy.
+    expose:
+      - "3000"
     depends_on:
       backend:
         condition: service_healthy
     environment:
       NODE_ENV: development
+      BACKEND_INTERNAL_URL: http://backend:8000/v1
+    logging: *default-logging
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: snt-caddy
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
+      TLS_CONFIG: ${TLS_CONFIG:-tls internal}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
     logging: *default-logging
     restart: unless-stopped
 
@@ -149,10 +183,11 @@ services:
     image: otel/opentelemetry-collector-contrib:0.112.0
     container_name: snt-otel
     command: ["--config=/etc/otel-collector-config.yml"]
-    ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "8888:8888"
+    # NOTE: No host port binding — OTel collector is internal-only.
+    expose:
+      - "4317"
+      - "4318"
+      - "8888"
     volumes:
       - ./otel-collector-config.yml:/etc/otel-collector-config.yml
     logging: *default-logging
@@ -161,8 +196,9 @@ services:
   prometheus:
     image: prom/prometheus:v2.54.0
     container_name: snt-prometheus
-    ports:
-      - "9090:9090"
+    # NOTE: No host port binding — Prometheus is internal-only.
+    expose:
+      - "9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus/alerting-rules.yml:/etc/prometheus/alerting-rules.yml
@@ -174,9 +210,10 @@ services:
     image: prometheuscommunity/postgres-exporter:v0.15.0
     container_name: snt-postgres-exporter
     environment:
-      DATA_SOURCE_NAME: "postgresql://snt:snt@postgres:5432/snt_ai?sslmode=disable"
-    ports:
-      - "9187:9187"
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/snt_ai?sslmode=disable"
+    # NOTE: No host port binding — pg-exporter is internal-only.
+    expose:
+      - "9187"
     depends_on:
       postgres:
         condition: service_healthy
@@ -188,18 +225,23 @@ services:
     container_name: snt-jaeger
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
-    ports:
-      - "16686:16686" # Jaeger UI
+    # NOTE: No host port binding — Jaeger UI is internal-only.
+    expose:
+      - "16686"
     logging: *default-logging
     restart: unless-stopped
 
   grafana:
     image: grafana/grafana:11.2.0
     container_name: snt-grafana
-    ports:
-      - "3001:3000"
+    # Grafana is internal-only by default. To expose it, add a port binding here
+    # and place it behind your reverse proxy with auth (e.g. Caddy basic_auth).
+    expose:
+      - "3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
       GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
     volumes:
       - grafana_data:/var/lib/grafana
@@ -214,3 +256,5 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  caddy_data:
+  caddy_config:

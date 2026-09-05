@@ -1,0 +1,50 @@
+# Caddyfile for SNT AI Production Deployment
+# Replace {$DOMAIN_NAME} with your actual domain or set DOMAIN_NAME in environment.
+# Defaults to localhost with internal TLS for local development/testing.
+
+{$DOMAIN_NAME:localhost} {
+    # Internal TLS fallback if using localhost/testing
+    # In production with a real domain, Caddy automatically provisions Let's Encrypt TLS certs.
+    {$TLS_CONFIG:tls internal}
+
+    # Security Headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Backend API routing
+    handle /v1/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /health {
+        reverse_proxy backend:8000
+    }
+
+    handle /docs {
+        reverse_proxy backend:8000
+    }
+
+    handle /redoc {
+        reverse_proxy backend:8000
+    }
+
+    handle /openapi.json {
+        reverse_proxy backend:8000
+    }
+
+    # Frontend Next.js routing (all other paths)
+    handle {
+        reverse_proxy frontend:3000
+    }
+
+    # Logging
+    log {
+        output stdout
+        format json
+    }
+}

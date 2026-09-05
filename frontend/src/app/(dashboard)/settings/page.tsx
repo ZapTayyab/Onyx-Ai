@@ -36,11 +36,11 @@ export default function SettingsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium">Name</label>
-              <Input defaultValue="SNT Admin" />
+              <Input placeholder="Your display name" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Email</label>
-              <Input defaultValue="admin@snt.ai" type="email" />
+              <Input placeholder="your@email.com" type="email" readOnly />
             </div>
           </div>
           <Button size="sm">Save Changes</Button>

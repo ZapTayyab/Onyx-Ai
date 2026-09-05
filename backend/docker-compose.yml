@@ -11,7 +11,7 @@ services:
       - SNT_POSTGRES_DSN=postgresql+asyncpg://snt:snt@postgres:5432/snt_ai
       - SNT_CLICKHOUSE_HOST=clickhouse
       - SNT_REDIS_DSN=redis://redis:6379/0
-      - SNT_ENCRYPTION_KEY=dev-secret-key-change-in-production
+      - SNT_ENCRYPTION_KEY=${SNT_ENCRYPTION_KEY:-dev-secret-key-change-in-production}
       - SNT_CORS_ORIGINS=["http://localhost:3000","http://localhost:3001","http://localhost:8501"]
     depends_on:
       postgres:

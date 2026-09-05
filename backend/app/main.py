@@ -15,14 +15,14 @@ from fastapi.exceptions import ResponseValidationError
 from app.config import RunStatus, get_config
 from app.core.cache import cache_service
 from app.core.clickhouse import clickhouse_mgr
-from app.core.database import close_db, init_db, _get_session_factory
+from app.core.database import close_db, init_db, _get_session_factory, _get_engine
 from app.core.exceptions import ErrorHandlingMiddleware
 from app.core.logging import configure_logging
 from app.core.temporal import init_temporal_client, close_temporal_client, get_temporal_client
 from app.middleware.auth_middleware import OrganizationContextMiddleware
 from app.middleware.rate_limiter import RateLimitMiddleware
 from app.models.postgres import RunMetadata
-from app.routers import agents, auth, evaluations, suites, organizations, billing
+from app.routers import agents, auth, evaluations, suites, organizations, billing, policy
 
 logger = logging.getLogger("snt_ai.main")
 
@@ -115,9 +115,17 @@ app.add_middleware(
     expose_headers=["X-Request-ID"],
 )
 
+allowed_hosts_calculated = (
+    ["*"]
+    if config.is_development
+    else [
+        origin.split("//")[-1].split("/")[0].split(":")[0]
+        for origin in config.cors_origins
+    ]
+)
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"] if config.is_development else config.cors_origins,
+    allowed_hosts=allowed_hosts_calculated,
 )
 
 app.add_middleware(ErrorHandlingMiddleware)
@@ -135,19 +143,39 @@ app.include_router(suites.router, prefix="/v1")
 app.include_router(evaluations.router, prefix="/v1")
 app.include_router(organizations.router, prefix="/v1")
 app.include_router(billing.router, prefix="/v1")
+app.include_router(policy.router, prefix="/v1")
 
 
 @app.get("/health", tags=["System"])
 async def health_check() -> dict:
+    """Liveness + readiness probe. Returns 503 if any critical dependency is down."""
+    # --- Postgres ---
+    db_status = "connected"
+    db_healthy = True
+    try:
+        engine = _get_engine()
+        async with engine.connect() as conn:
+            await conn.execute(sqlalchemy.text("SELECT 1"))
+    except Exception as exc:
+        logger.warning("Health check: Postgres unreachable — %s", exc)
+        db_status = "unavailable"
+        db_healthy = False
+
+    # --- ClickHouse ---
     ch_healthy = await clickhouse_mgr.health_check()
-    return {
-        "status": "healthy",
+
+    overall = "healthy" if (db_healthy and ch_healthy) else "unhealthy"
+    payload = {
+        "status": overall,
         "version": "1.0.0",
         "environment": config.environment.value,
-        "database": "connected",
+        "database": db_status,
         "clickhouse": "connected" if ch_healthy else "unavailable",
         "auth_provider": config.auth_provider,
     }
+    if overall == "unhealthy":
+        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content=payload)
+    return payload
 
 
 if __name__ == "__main__":

@@ -75,10 +75,11 @@ async def get_agent(
     payload: TokenPayload = Depends(require_member),
     db: AsyncSession = Depends(get_async_session),
 ) -> TargetAgentModel:
+    org_id = uuid.UUID(str(payload.org_id))
     result = await db.execute(
         select(TargetAgentModel).where(
             TargetAgentModel.id == agent_id,
-            TargetAgentModel.organization_id == payload.org_id,
+            TargetAgentModel.organization_id == org_id,
         )
     )
     agent = result.scalar_one_or_none()

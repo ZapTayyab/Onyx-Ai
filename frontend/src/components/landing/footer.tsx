@@ -6,7 +6,6 @@ export function Footer() {
     { title: "Product", links: footerLinks.product },
     { title: "Resources", links: footerLinks.resources },
     { title: "Company", links: footerLinks.company },
-    { title: "Compliance", links: footerLinks.compliance },
   ];
 
   return (

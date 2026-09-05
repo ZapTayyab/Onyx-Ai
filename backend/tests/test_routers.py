@@ -43,6 +43,15 @@ def _make_token(role: str = "admin") -> str:
 @pytest.fixture(scope="module")
 def client():
     """Return a TestClient with all external services patched."""
+    # Mock a healthy DB engine connection for the SELECT 1 probe in /health
+    _mock_conn = AsyncMock()
+    _mock_conn.__aenter__ = AsyncMock(return_value=_mock_conn)
+    _mock_conn.__aexit__ = AsyncMock(return_value=False)
+    _mock_conn.execute = AsyncMock(return_value=None)
+
+    _mock_engine = MagicMock()
+    _mock_engine.connect = MagicMock(return_value=_mock_conn)
+
     with (
         patch("app.core.database.init_db", new_callable=AsyncMock),
         patch("app.core.database.close_db", new_callable=AsyncMock),
@@ -54,6 +63,8 @@ def client():
         patch("app.core.clickhouse.clickhouse_mgr.health_check", return_value=True),
         # Patch the session factory so DB calls in middleware are no-ops
         patch("app.core.database._get_session_factory"),
+        # Patch the engine so the /health SELECT 1 probe doesn't hit real Postgres
+        patch("app.main._get_engine", return_value=_mock_engine),
     ):
         from app.main import app
         with TestClient(app, raise_server_exceptions=False) as c:
@@ -65,13 +76,59 @@ def client():
 class TestHealth:
     def test_health_returns_200(self, client: TestClient) -> None:
         r = client.get("/health")
-        assert r.status_code == 200
+        assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text}"
 
     def test_health_body(self, client: TestClient) -> None:
         body = client.get("/health").json()
         assert body["status"] == "healthy"
+        assert body["database"] == "connected"
         assert "version" in body
         assert "environment" in body
+
+
+class TestHealthUnhealthy:
+    """Prove /health returns 503 + unhealthy status when Postgres is unreachable.
+
+    We do NOT mock _get_engine here so the SELECT 1 hits a bad DSN and fails.
+    """
+
+    def test_health_returns_503_when_db_down(self) -> None:
+        import importlib
+        import sys
+
+        # Remove cached module so we get a fresh app instance
+        for mod in list(sys.modules.keys()):
+            if "app.main" in mod:
+                del sys.modules[mod]
+
+        _mock_conn = AsyncMock()
+        _mock_conn.__aenter__ = AsyncMock(return_value=_mock_conn)
+        _mock_conn.__aexit__ = AsyncMock(return_value=False)
+        _mock_conn.execute = AsyncMock(side_effect=Exception("Connection refused"))
+
+        _mock_engine = MagicMock()
+        _mock_engine.connect = MagicMock(return_value=_mock_conn)
+
+        with (
+            patch("app.core.database.init_db", new_callable=AsyncMock),
+            patch("app.core.database.close_db", new_callable=AsyncMock),
+            patch("app.core.cache.cache_service.initialize", new_callable=AsyncMock),
+            patch("app.core.cache.cache_service.close", new_callable=AsyncMock),
+            patch("app.core.clickhouse.clickhouse_mgr.connect"),
+            patch("app.core.clickhouse.clickhouse_mgr.execute", new_callable=AsyncMock, return_value=[]),
+            patch("app.core.clickhouse.clickhouse_mgr.close"),
+            patch("app.core.clickhouse.clickhouse_mgr.health_check", return_value=True),
+            patch("app.core.database._get_session_factory"),
+            patch("app.main._get_engine", return_value=_mock_engine),
+        ):
+            from app.main import app
+            with TestClient(app, raise_server_exceptions=False) as c:
+                r = c.get("/health")
+
+        assert r.status_code == 503, f"Expected 503, got {r.status_code}: {r.text}"
+        body = r.json()
+        assert body["status"] == "unhealthy"
+        assert body["database"] == "unavailable"
 
 
 # ── Auth ───────────────────────────────────────────────────────────

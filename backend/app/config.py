@@ -118,7 +118,33 @@ class AppConfig(BaseSettings):
     def is_production(self) -> bool:
         return self.environment == RuntimeEnvironment.PRODUCTION
 
+    def validate_production_safety(self) -> None:
+        """Raise at startup if dangerous defaults are detected in production."""
+        if not self.is_production:
+            return
+        errors: list[str] = []
+        if not self.encryption_key or self.encryption_key == "dev-secret-key-change-in-production":
+            errors.append("SNT_ENCRYPTION_KEY must be set to a random secret in production")
+        if not self.cors_origins or any("localhost" in o for o in self.cors_origins):
+            errors.append(
+                "SNT_CORS_ORIGINS must not contain 'localhost' in production — "
+                f"current value: {self.cors_origins}"
+            )
+        if self.auth_provider == "local" and self.is_production:
+            errors.append(
+                "SNT_AUTH_PROVIDER=local uses a dev-only code path. "
+                "Use 'clerk' or 'auth0' in production."
+            )
+        if errors:
+            raise RuntimeError(
+                "Production safety check FAILED — refusing to start:\n"
+                + "\n".join(f"  • {e}" for e in errors)
+            )
+
 
 @lru_cache
 def get_config() -> AppConfig:
-    return AppConfig()
+    cfg = AppConfig()
+    cfg.validate_production_safety()
+    return cfg
+

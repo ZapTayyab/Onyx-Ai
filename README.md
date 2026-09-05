@@ -22,7 +22,7 @@ flowchart LR
 
     subgraph BE[Backend — FastAPI]
         MW[Middeware<br/>CORS · Auth · Rate Limit · Error]
-        RT[Routers<br/>6 routers · 37 endpoints]
+        RT[Routers<br/>7 routers · 35 endpoints]
         SV[Services Layer]
         MW --> RT --> SV
     end
@@ -77,7 +77,8 @@ flowchart LR
 │  │  Middleware Stack: CORS → TrustedHost → Error → RateLimit   │    │
 │  │  → OrgContext                                               │    │
 │  ├──────────────────────────────────────────────────────────────┤    │
-│  │  Routers: auth · agents · suites · evaluations · orgs · bill│    │
+│  │  Routers: auth · agents · suites · evaluations              │    │
+│  │  orgs · bill · policy                                       │    │
 │  ├──────────────────────────────────────────────────────────────┤    │
 │  │  Services: persona_generator · chaos_injector · llm_judge   │    │
 │  │  evaluation_runner · clickhouse_flusher · report_generator  │    │
@@ -107,24 +108,24 @@ flowchart LR
 
 ## Current Progress
 
-**Phase: MVP Complete** — All core components are built, tested, and deployable.
+**Phase: Core functionality complete; production-hardening in progress** — all core components are built and tested, but hardening work remains (TLS not yet live, Temporal resilience is a documented stopgap, restore tests have only run against synthetic data).
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| Backend API | ✅ | 37 endpoints, 8 services, full middleware stack |
+| Backend API | ✅ | 35 endpoints, 11 services, full middleware stack |
 | Frontend | ✅ | Dashboard, evaluations, traces, alerts, reports, settings, marketing pages |
 | Evaluation Pipeline | ✅ | 8 personas, 3 chaos profiles, dual-mode judge, anomaly detection, alerting |
 | Temporal Workflows | ✅ | Fault-tolerant evaluation workflow + background worker |
 | CI/CD | ✅ | GitHub Actions: lint → test → build → Docker push to ghcr.io |
 | Observability | ✅ | OTel + Prometheus + Grafana + Jaeger, 8 alert rules, 9-panel dashboard |
-| Infrastructure | ✅ | 15-service docker-compose, production-ready configuration |
-| Tests | ✅ | 131 backend tests, all passing |
+| Infrastructure | ✅ | 13-service docker-compose; production-hardening in progress |
+| Tests | ✅ | 180 backend tests (179 passing, 1 skipped) |
 
 **Key Milestones:**
-- 131/131 backend tests passing across 14 test suites
-- Full 15-service stack runs with a single `docker compose up`
+- 180 backend tests across 18 test files (179 passing, 1 skipped)
+- Full 13-service stack runs with a single `docker compose up`
 - JUnit XML report generation for CI/CD gating
-- 8 built-in adversarial personas + 3 programmatic chaos profiles
+- 8 built-in personas (3 adversarial, 2 standard, 3 edge-case) + 3 programmatic chaos profiles
 - Prometheus alerting (8 rules) + Grafana monitoring (9 panels)
 
 **Next Focus Areas:**
@@ -144,7 +145,7 @@ flowchart LR
 | **Cache & Queue** | Redis 7 (hiredis driver) |
 | **Application DB** | PostgreSQL 16 (SQLAlchemy 2.0 async ORM, Alembic async migrations) |
 | **Analytics DB** | ClickHouse (ReplacingMergeTree, columnar, partitioned by org+month) |
-| **Auth** | Clerk / Auth0 (OIDC, JWKS verification, role-based access control) |
+| **Auth** | Current login: built-in email/password (dev/local). Target: Clerk / Auth0 OIDC, JWKS verification, RBAC — server-side verification implemented; IdP sign-in flow not live yet |
 | **LLM Integration** | OpenAI, Anthropic, vLLM (local open-source judges), LiteLLM |
 | **Observability** | OpenTelemetry (traces + metrics), Prometheus, Grafana |
 | **CI/CD** | GitHub Actions (lint â†’ test â†’ build â†’ Docker push) |
@@ -185,8 +186,8 @@ Compare two AI system variants over the identical scenario set:
 - **Error Handling**: Typed exceptions (NotFoundError, ConflictError, ForbiddenError, ServiceUnavailableError)
 - **Anomaly Detection**: Statistical regression detection, persona category thresholding, issue clustering
 - **Alerting**: Webhook delivery service, automatic score regression and evaluation completion alerts
-- **SSO**: SAML/OIDC configuration per organization
-- **Billing**: Stripe webhook integration, plan management
+- **SSO**: SSO configuration settings per organization (config storage only — no IdP sign-in flow yet; planned)
+- **Billing**: Stripe webhook event parsing + plan management — signature check is a custom HMAC (not Stripe's native verification); billing portal returns a static URL (Stripe API integration planned)
 - **Team Management**: Member invite/remove, role-based access
 
 ---
@@ -328,7 +329,7 @@ snt-ai/
 â”‚   â”‚   â”‚   â”œâ”€â”€ agents.py
 â”‚   â”‚   â”‚   â”œâ”€â”€ suites.py
 â”‚   â”‚   â”‚   â””â”€â”€ auth.py
-â”‚   â”‚   â”œâ”€â”€ routers/              # 6 routers, 37 endpoints
+â”‚   â”‚   â”œâ”€â”€ routers/              # 7 routers, 35 endpoints
 â”‚   â”‚   â”‚   â”œâ”€â”€ auth.py           # GET /auth/me, /auth/audit-log, POST /auth/audit
 â”‚   â”‚   â”‚   â”œâ”€â”€ agents.py         # CRUD /agents (5 endpoints)
 â”‚   â”‚   â”‚   â”œâ”€â”€ suites.py         # CRUD /suites (5 endpoints)
@@ -350,7 +351,7 @@ snt-ai/
 â”‚   â”‚       â”œâ”€â”€ auth_middleware.py       # OrganizationContextMiddleware
 â”‚   â”‚       â””â”€â”€ rate_limiter.py          # Sliding window per-client + route decorator
 â”‚   â”œâ”€â”€ migrations/               # Alembic async migrations
-â”‚   â”œâ”€â”€ tests/                    # 131 tests across 13 files
+â”‚   â”œâ”€â”€ tests/                    # 180 tests across 18 files
 â”‚   â”œâ”€â”€ Dockerfile                # Multi-stage (builder â†’ runner)
 â”‚   â”œâ”€â”€ pyproject.toml            # Ruff config, pytest config
 â”‚   â”œâ”€â”€ .env.example
@@ -387,7 +388,7 @@ snt-ai/
 â”‚   â”œâ”€â”€ tailwind.config.ts        # Tremor colors + Shadcn CSS variables
 â”‚   â””â”€â”€ tsconfig.json
 â”œâ”€â”€ infra/
-â”‚   â”œâ”€â”€ docker-compose.yml        # 10 services (postgres, clickhouse, redis, temporal, backend, frontend, otel, prometheus, grafana)
+â”‚   â”œâ”€â”€ docker-compose.yml        # 13 services (postgres, clickhouse, redis, temporal, temporal-admin-tools, backend, frontend, caddy, otel-collector, prometheus, postgres-exporter, jaeger, grafana)
 â”‚   â”œâ”€â”€ otel-collector-config.yml
 â”‚   â”œâ”€â”€ prometheus/
 â”‚   â”‚   â”œâ”€â”€ prometheus.yml        # Scrape configs + alerting rules reference
@@ -466,7 +467,7 @@ All routes are prefixed with `/v1`. Full OpenAPI documentation at `/docs`.
 | GET | `/organizations/me/billing` | Admin | Get billing plan |
 | PATCH | `/organizations/me/billing` | Admin | Update billing plan |
 | GET | `/organizations/me/sso` | Admin | Get SSO configuration |
-| PUT | `/organizations/me/sso` | Admin | Configure SSO (SAML/OIDC) |
+| PUT | `/organizations/me/sso` | Admin | Store SSO configuration (settings only — IdP sign-in flow planned) |
 
 ### Billing (`/v1/billing`)
 
@@ -531,12 +532,12 @@ Key configuration (see `backend/.env.example` for full list).
 | `SNT_REDIS_DSN` | `redis://localhost:6379/0` | Redis connection |
 | `SNT_TEMPORAL_HOST` | `localhost:7233` | Temporal server address |
 | `SNT_TEMPORAL_NAMESPACE` | `snt-ai-default` | Temporal namespace |
-| `SNT_AUTH_PROVIDER` | `clerk` | Auth provider (`clerk` or `auth0`) |
+| `SNT_AUTH_PROVIDER` | `clerk` | Auth provider (`clerk`, `auth0`, or `local`) |
 | `SNT_CLERK_SECRET_KEY` | â€” | Clerk API secret |
 | `SNT_CLERK_PUBLISHABLE_KEY` | â€” | Clerk publishable key |
 | `SNT_AUTH0_DOMAIN` | â€” | Auth0 tenant domain |
 | `SNT_AUTH0_AUDIENCE` | â€” | Auth0 API audience |
-| `SNT_ENCRYPTION_KEY` | â€” | Encryption key for sensitive fields |
+| `SNT_ENCRYPTION_KEY` | â€” | JWT/HMAC signing secret (auth tokens, webhook signatures) |
 | `SNT_OPENAI_API_KEY` | â€” | OpenAI key for LLM-as-a-Judge |
 | `SNT_ANTHROPIC_API_KEY` | â€” | Anthropic key |
 | `SNT_VLLM_ENDPOINT` | â€” | Local vLLM inference endpoint |
@@ -553,7 +554,7 @@ Key configuration (see `backend/.env.example` for full list).
 
 ## Running Tests
 
-### Backend (131 tests)
+### Backend (180 tests)
 
 ```bash
 cd backend
@@ -635,20 +636,25 @@ The `.github/workflows/ci.yml` runs 4 jobs on push/PR:
 
 | File | Tests | What it covers |
 |------|-------|----------------|
+| `test_compliance_report.py` | 4 | Compliance evidence mapping to OWASP/NIST standards |
 | `test_config.py` | 7 | Default config, env parsing, enums, status transitions |
 | `test_models.py` | 13 | ORM creation, relationships, cascade deletes |
-| `test_security.py` | 9 | Clerk/Auth0 role mapping, audit logging |
-| `test_llm_judge.py` | 16 | Turn evaluation, scores, injection patterns, grounding |
-| `test_chaos_injector.py` | 12 | Profile config, latency, bloat, guardrail, mock agent |
-| `test_persona_generator.py` | 10 | Builtin profiles, filtering, scripts, LLM fallback |
-| `test_clickhouse_schema.py` | 9 | DDL columns, engine type, partitioning, query correctness |
+| `test_security.py` | 10 | Clerk/Auth0 role mapping, audit logging |
+| `test_llm_judge.py` | 15 | Turn evaluation, scores, injection patterns, grounding |
+| `test_chaos_injector.py` | 16 | Profile config, latency, bloat, guardrail, mock agent |
+| `test_persona_generator.py` | 11 | Builtin profiles, filtering, scripts, LLM fallback |
+| `test_clickhouse_schema.py` | 10 | DDL columns, engine type, partitioning, query correctness |
 | `test_report_generator.py` | 7 | JUnit XML, failure elements, summary, anomaly section |
-| `test_anomaly_detector.py` | 11 | Regression, latency, persona thresholds, issue clusters |
+| `test_routers.py` | 15 | Router endpoints: health, auth, billing webhook, report formats |
+| `test_anomaly_detector.py` | 12 | Regression, latency, persona thresholds, issue clusters |
+| `test_agentic_chaos.py` | 11 | Agentic chaos engine: indirect injection, MCP tool-output spoofing, permission escalation |
 | `test_alerting.py` | 9 | Webhook register/unregister, send alerts |
 | `test_rate_limiter.py` | 6 | Sliding window, key isolation, stale cleanup |
 | `test_cache.py` | 7 | Degraded mode, get/set/delete/invalidate |
+| `test_eval_use_case.py` | 10 | Run-evaluation use case + policy engine thresholds |
 | `test_exceptions.py` | 9 | Typed exceptions, HTTP inheritance, middleware |
-| **Total** | **131** | **All passing (1 skipped: timing-sensitive)** |
+| `test_tenant_isolation.py` | 8 | Cross-tenant isolation (repository + router access) |
+| **Total** | **180** | **179 passing, 1 skipped (timing-sensitive)** |
 
 ---
 
@@ -662,9 +668,3 @@ Proprietary. All rights reserved. SNT AI Confidential.
 
 - Email: support@snt.ai
 - Issues: [https://github.com/anomalyco/opencode/issues](https://github.com/anomalyco/opencode/issues)
-
-## Cheatsheet for your agent
-- Agent type: Custom (Ollama is OpenAI-compatible)  
-- Endpoint URL: http://host.docker.internal:11434/v1/chat/completions  
-- Model name: llama3.2
-# Onyx

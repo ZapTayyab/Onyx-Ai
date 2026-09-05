@@ -149,7 +149,7 @@ export default function RequestDemoPage() {
                 </ul>
                 <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-4">
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    <span className="font-semibold text-slate-700">SOC 2 compliant.</span> Your data is protected by AES-256 encryption and never shared with third parties.
+                    <span className="font-semibold text-slate-700">Built for SOC 2 readiness.</span> Your data is encrypted in transit (TLS).
                   </p>
                 </div>
               </div>
